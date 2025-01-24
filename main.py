@@ -30,13 +30,16 @@ def configure_logging(config: dict):
     return log
 
 
-def configure_hap_accessory(config: dict, homekey_service=None):
-    driver = AccessoryDriver(port=config["port"], persist_file=config["persist"])
+def configure_hap_accessory(hap_config: dict, homekey_config: dict, homekey_service=None):
+    driver = AccessoryDriver(port=hap_config["port"], persist_file=hap_config["persist"])
     accessory = Lock(
         driver,
-        "NFC Lock",
+        homekey_config["name"],
+        manufacturer=homekey_config["manufacturer"],
+        serialNumber=homekey_config["serialNumber"],
+        model=homekey_config["model"],
         service=homekey_service,
-        lock_state_at_startup=int(config.get("default") != "unlocked")
+        lock_state_at_startup=int(hap_config.get("default") != "unlocked")
     )
     driver.add_accessory(accessory=accessory)
     return driver, accessory
@@ -67,9 +70,12 @@ def main():
     config = load_configuration()
     log = configure_logging(config["logging"])
 
-    nfc_device = configure_nfc_device(config["nfc"])
-    homekey_service = configure_homekey_service(config["homekey"], nfc_device)
-    hap_driver, _ = configure_hap_accessory(config["hap"], homekey_service)
+    nfc_config = config["nfc"]
+    hap_config = config["hap"]
+    homekey_config = config["homekey"]
+    nfc_device = configure_nfc_device(nfc_config)
+    homekey_service = configure_homekey_service(homekey_config, nfc_device)
+    hap_driver, _ = configure_hap_accessory(hap_config, homekey_config, homekey_service)
 
     for s in (signal.SIGINT, signal.SIGTERM):
         signal.signal(

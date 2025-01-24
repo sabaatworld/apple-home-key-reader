@@ -4,7 +4,7 @@
     },
 
     "nfc": {
-        "path": "tty:usbserial-0001:pn532",
+        "path": "tty:usbserial-110:pn532",
         "broadcast": true
     },
 
@@ -17,7 +17,11 @@
     "homekey": {
         "persist": "homekey.json",
         "express": true,
-        "finish": "silver",
-        "flow": "fast"
+        "finish": "black",
+        "flow": "fast",
+        "name": "Garage Door Lock",
+        "manufacturer": "Unknown Manufacturer",
+        "serialNumber": "Unknown Serial Number",
+        "model": "Unknown Model"
     }
 }
