@@ -13,10 +13,11 @@ log = logging.getLogger()
 class Lock(Accessory):
     category = CATEGORY_DOOR_LOCK
 
-    def __init__(self, *args, manufacturer: str, serialNumber: str, model: str, service: Service, lock_state_at_startup=1, **kwargs):
+    def __init__(self, *args, manufacturer: str, serialNumber: str, model: str, firmware: str, service: Service, lock_state_at_startup=1, **kwargs):
         self.manufacturer = manufacturer
         self.serialNumber = serialNumber
         self.model = model
+        self.firmware = firmware
 
         super().__init__(*args, **kwargs)
         self._last_client_public_keys = None
@@ -72,6 +73,8 @@ class Lock(Accessory):
         serv_info.configure_char("Manufacturer", value=self.manufacturer)
         serv_info.configure_char("SerialNumber", value=self.serialNumber)
         serv_info.configure_char("Model", value=self.model)
+        serv_info.add_characteristic(self.driver.loader.get_char("FirmwareRevision"))
+        serv_info.configure_char("FirmwareRevision", value=self.firmware)
         serv_info.add_characteristic(self.driver.loader.get_char("HardwareFinish"))
         serv_info.configure_char(
             "HardwareFinish", getter_callback=self.get_hardware_finish

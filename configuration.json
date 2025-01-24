@@ -22,6 +22,7 @@
         "name": "Garage Door Lock",
         "manufacturer": "Unknown Manufacturer",
         "serialNumber": "Unknown Serial Number",
-        "model": "Unknown Model"
+        "model": "Unknown Model",
+        "firmware": "1.0"
     }
 }

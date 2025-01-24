@@ -38,6 +38,7 @@ def configure_hap_accessory(hap_config: dict, homekey_config: dict, homekey_serv
         manufacturer=homekey_config["manufacturer"],
         serialNumber=homekey_config["serialNumber"],
         model=homekey_config["model"],
+        firmware=homekey_config["firmware"],
         service=homekey_service,
         lock_state_at_startup=int(hap_config.get("default") != "unlocked")
     )
