@@ -1,0 +1,6 @@
+{
+    "useSSL": false,
+    "serverAddress": "XXX.XXX.XXX.XXX:8123",
+    "apiToken": "XXXX",
+    "entityId": "cover.garage_door"
+}

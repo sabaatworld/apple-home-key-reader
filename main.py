@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import requests
 import signal
 import sys
 
@@ -12,10 +14,20 @@ from util.bfclf import BroadcastFrameContactlessFrontend
 
 # By default, this file is located in the same folder as the project
 CONFIGURATION_FILE_PATH = "configuration.json"
+HA_CONFIGURATION_FILE_PATH = "home-assistant.json"
 
 
 def load_configuration(path=CONFIGURATION_FILE_PATH) -> dict:
-    return json.load(open(path, "r+"))
+    with open(path, "r+") as file:
+        return json.load(file)
+
+
+def load_ha_configuration(path=HA_CONFIGURATION_FILE_PATH) -> dict:
+    """Load the Home Assistant configuration if the file exists, otherwise return None."""
+    if os.path.exists(path):
+        return load_configuration(path)
+    else:
+        return None
 
 
 def configure_logging(config: dict):
@@ -30,7 +42,7 @@ def configure_logging(config: dict):
     return log
 
 
-def configure_hap_accessory(hap_config: dict, homekey_config: dict, homekey_service=None):
+def configure_hap_accessory(hap_config: dict, homekey_config: dict, ha_config: dict, homekey_service=None):
     driver = AccessoryDriver(port=hap_config["port"], persist_file=hap_config["persist"])
     accessory = Lock(
         driver,
@@ -39,6 +51,7 @@ def configure_hap_accessory(hap_config: dict, homekey_config: dict, homekey_serv
         serialNumber=homekey_config["serialNumber"],
         model=homekey_config["model"],
         firmware=homekey_config["firmware"],
+        ha_config=ha_config,
         service=homekey_service,
         lock_state_at_startup=int(hap_config.get("default") != "unlocked")
     )
@@ -69,6 +82,7 @@ def configure_homekey_service(config: dict, nfc_device, repository=None):
 
 def main():
     config = load_configuration()
+    ha_config = load_ha_configuration()
     log = configure_logging(config["logging"])
 
     nfc_config = config["nfc"]
@@ -76,7 +90,7 @@ def main():
     homekey_config = config["homekey"]
     nfc_device = configure_nfc_device(nfc_config)
     homekey_service = configure_homekey_service(homekey_config, nfc_device)
-    hap_driver, _ = configure_hap_accessory(hap_config, homekey_config, homekey_service)
+    hap_driver, _ = configure_hap_accessory(hap_config, homekey_config, ha_config, homekey_service)
 
     for s in (signal.SIGINT, signal.SIGTERM):
         signal.signal(

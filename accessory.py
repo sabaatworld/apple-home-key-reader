@@ -1,5 +1,7 @@
 import functools
+import json
 import logging
+import requests
 
 from pyhap.accessory import Accessory
 from pyhap.const import CATEGORY_DOOR_LOCK
@@ -13,15 +15,22 @@ log = logging.getLogger()
 class Lock(Accessory):
     category = CATEGORY_DOOR_LOCK
 
-    def __init__(self, *args, manufacturer: str, serialNumber: str, model: str, firmware: str, service: Service, lock_state_at_startup=1, **kwargs):
+    def __init__(self, *args, manufacturer: str, serialNumber: str, model: str, firmware: str, ha_config: dict, service: Service, lock_state_at_startup=1, **kwargs):
         self.manufacturer = manufacturer
         self.serialNumber = serialNumber
         self.model = model
         self.firmware = firmware
+        self.ha_config = ha_config
+        if self.ha_config:
+            self.ha_server_address = self.get_ha_server_address()
+            self.ha_api_token = ha_config.get("apiToken")
+            self.ha_entity_id = ha_config.get("entityId")
 
         super().__init__(*args, **kwargs)
         self._last_client_public_keys = None
 
+        if self.ha_config:
+            lock_state_at_startup = self.get_lock_state_from_ha()
         self._lock_target_state = lock_state_at_startup
         self._lock_current_state = lock_state_at_startup
 
@@ -31,6 +40,7 @@ class Lock(Accessory):
         self.add_nfc_access_service()
         self.add_unpair_hook()
 
+
     def on_endpoint_authenticated(self, endpoint):
         self._lock_target_state = 0 if self._lock_current_state else 1
         log.info(
@@ -39,6 +49,9 @@ class Lock(Accessory):
         self.lock_target_state.set_value(self._lock_target_state, should_notify=True)
         self._lock_current_state = self._lock_target_state
         self.lock_current_state.set_value(self._lock_current_state, should_notify=True)
+
+        if self.ha_config:
+            self.set_lock_state_in_ha(self._lock_target_state)
 
     def add_unpair_hook(self):
         unpair = self.driver.unpair
@@ -134,6 +147,9 @@ class Lock(Accessory):
 
     def get_lock_current_state(self):
         log.info("get_lock_current_state")
+        if self.ha_config:
+            self._lock_target_state = self._lock_current_state = self.get_lock_state_from_ha()
+            self.lock_current_state.set_value(self._lock_current_state, should_notify=True)
         return self._lock_current_state
 
     def get_lock_target_state(self):
@@ -144,6 +160,10 @@ class Lock(Accessory):
         log.info(f"set_lock_target_state {value}")
         self._lock_target_state = self._lock_current_state = value
         self.lock_current_state.set_value(self._lock_current_state, should_notify=True)
+
+        if self.ha_config:
+            self.set_lock_state_in_ha(value)
+
         return self._lock_target_state
 
     def get_lock_version(self):
@@ -186,3 +206,46 @@ class Lock(Accessory):
     def on_unpair(self, client_id):
         log.info(f"on_unpair {client_id}")
         self._update_hap_pairings()
+
+    def get_lock_state_from_ha(self):
+        try:
+            # Fetch the current cover state from Home Assistant
+            url = f"{self.ha_server_address}/api/states/{self.ha_entity_id}"
+            headers = {
+                "Authorization": f"Bearer {self.ha_api_token}",
+                "Content-Type": "application/json",
+            }
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                state = response.json()
+                # Set lock state based on cover state
+                return 1 if state.get("state") == "closed" else 0
+        except Exception as e:
+            log.error(f"Error fetching cover state from Home Assistant: {e}")
+        return 0
+
+    # Method to set the cover state in Home Assistant (locked = closed, unlocked = open)
+    def set_lock_state_in_ha(self, lock_target_state):
+        cover_target_state = "closed" if lock_target_state == 1 else "open"
+        service = "close_cover" if cover_target_state == 'closed' else "open_cover"
+
+        try:
+            url = f"{self.ha_server_address}/api/services/cover/{service}"
+            headers = {
+                "Authorization": f"Bearer {self.ha_api_token}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "entity_id": self.ha_entity_id
+            }
+            response = requests.post(url, json=payload, headers=headers)
+            if response.status_code == 200:
+                log.info(f"Successfully set cover state to {cover_target_state}")
+            else:
+                log.error(f"Failed to set cover state to {cover_target_state}: {response.text}")
+        except Exception as e:
+            log.error(f"Error setting cover state in Home Assistant: {e}")
+
+    def get_ha_server_address(self):
+        scheme = "https" if self.ha_config.get("useSSL") else "http"
+        return f"{scheme}://{self.ha_config.get('serverAddress')}"

@@ -23,6 +23,7 @@ persist.json
 accessory.state
 homekey.json
 hap.state
+home-assistant.json
 
 # IDE's
 .idea/*
