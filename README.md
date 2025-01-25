@@ -92,13 +92,30 @@ Configuration is done via a JSON file `configuration.json`, with the following 4
        Possible values: `black` `tan` `gold` `silver`;
     * `flow`: minimum viable digital key transaction flow to do. By default, reader attempts to do as least actions as possible, with fallback to next level of authentication only happening if the previous one failed. Setting this setting to `standard` or `attestation` will force protocol to fall back to those flows even if they're not required for successful auth.  
     Possible values: `fast` `standard` `attestation`.
+    * `name`: Name for lock accessory.
+    * `manufacturer`: Lock accessory manufacturer. Shows up lock accessory information in the Home app. Can be anything.
+    * `serialNumber`: Lock accessory serial number. Shows up lock accessory information in the Home app. Can be anything.
+    * `model`: Lock accessory model. Shows up lock accessory information in the Home app. Can be anything.
+    * `firmware`: Lock accessory fimware revision. Shows up lock accessory information in the Home app. Can be anything.
 
+## Control Home Assistant Cover Entity
+
+You can configure additional settings to link the state of the NFC lock with a Home Assistant `cover` entity, such as a garage door. Once linked, locking the NFC lock will close the garage door, and unlocking it will open the door. If the state of the cover entity is updated in Home Assistant, the state of the NFC lock will be automatically updated as well. To enable this optional feature, follow these steps:
+
+1. Clone `home-assistant.json.example` to `home-assistant.json` in the same directory.
+2. Update `home-assistant.json` with the following values:
+    * `useSSL`: Specifies whether to use SSL (HTTPS / WSS) or not (HTTP / WS) when connecting to Home Assistant.
+    * `serverAddress`: The IP address or hostname of the Home Assistant server, along with the port number.
+    * `apiToken`: A long-lived access token generated in Home Assistant. You can follow [this guide](https://developers.home-assistant.io/docs/auth_api/#long-lived-access-token) to generate it.
+    * `entityId`: A valid cover entity in your Home Assistant instance.
+3. Whenever you start the application, it will attempt to connect to your Home Assistant instance and link the lock to the configured cover entity.
 
 # Project structure
 
 Project is split into following primary modules:
 - `main.py` - initialize and start all primary classes, configure device ports, etc;
-- `accessory.py` - service definitions for HAP, contains no logic, with it forwarded to `service.py`;
+- `accessory.py` - service definitions for HAP, contains no logic, with it forwarded to `service.py`
+- `home_assistant.py` - logic to enable `accessory.py` interact with Home Assistant
 - `service.py` - implements core application functionality, parsing HAP messages and generating responses to them, initiating NFC communication.
 - `homekey.py` - homekey NFC part of the protocol implementation;  
 
