@@ -2,12 +2,14 @@ import json
 import logging
 import requests
 import threading
+import time
 import websockets.sync.client as ws_client
 
 log = logging.getLogger()
 
 
 class HomeAssistant:
+    websocket_reconnect_interval = 5
     ha_entity_state_subscription_id = 21
 
     def __init__(self, ha_config: dict, apply_lock_state: callable):
@@ -74,36 +76,42 @@ class HomeAssistant:
     def start_websocket_listener_thread(self):
         # Start the websocket listener in a separate thread
         thread = threading.Thread(
-            target=self.websocket_listener,
+            target=self.websocket_listener_with_reconnect,
             daemon=True
         )
         thread.start()
 
+    def websocket_listener_with_reconnect(self):
+        while True:
+            try:
+                self.websocket_listener()
+            except Exception as e:
+                log.error(f"WebSocket listener encountered an error: {e}. Reconnecting in {HomeAssistant.websocket_reconnect_interval} seconds...")
+                time.sleep(HomeAssistant.websocket_reconnect_interval)  # Wait before reconnecting
+
     def websocket_listener(self):
         uri = f"{self.ha_ws_address}/api/websocket"
         log.info(f"HA WebSocket URL: {uri}")
-        try:
-            with ws_client.connect(uri) as websocket:
-                # Wait for "auth_required" message
-                initial_message = websocket.recv()
-                initial_data = json.loads(initial_message)
-                if initial_data.get("type") == "auth_required":
-                    log.info("HA Server requires authentication")
-                    self.websocket_authenticate(websocket)
-                else:
-                    log.error("Unexpected initial message from server")
-                    raise ConnectionError("Unexpected initial message from server")
 
-                self.subscribe_to_cover_state(websocket)
-                self.handle_cover_state(self.get_cover_state_from_ha())
+        with ws_client.connect(uri) as websocket:
+            # Wait for "auth_required" message
+            initial_message = websocket.recv()
+            initial_data = json.loads(initial_message)
+            if initial_data.get("type") == "auth_required":
+                log.info("HA Server requires authentication")
+                self.websocket_authenticate(websocket)
+            else:
+                log.error("Unexpected initial message from server")
+                raise ConnectionError("Unexpected initial message from server")
 
-                while True:
-                    message = websocket.recv()
-                    message_data = json.loads(message)
-                    if message_data.get("type") == "event" and message_data.get("id") == HomeAssistant.ha_entity_state_subscription_id:
-                        self.process_cover_state_update_message(message_data)
-        except Exception as e:
-            log.error(f"WebSocket listener encountered an error: {e}")
+            self.subscribe_to_cover_state(websocket)
+            self.handle_cover_state(self.get_cover_state_from_ha())
+
+            while True:
+                message = websocket.recv()
+                message_data = json.loads(message)
+                if message_data.get("type") == "event" and message_data.get("id") == HomeAssistant.ha_entity_state_subscription_id:
+                    self.process_cover_state_update_message(message_data)
 
     def websocket_authenticate(self, websocket):
         log.info(f"HA WebSocket Authenticating")

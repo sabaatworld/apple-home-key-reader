@@ -1,16 +1,10 @@
-import asyncio
 import functools
-import json
 import logging
-import requests
-import threading
-import websockets.sync.client as ws_client
 
 from home_assistant import HomeAssistant
 from pyhap.accessory import Accessory
 from pyhap.const import CATEGORY_DOOR_LOCK
 from service import Service
-from util.threads import create_runner
 
 log = logging.getLogger()
 
