@@ -4,7 +4,7 @@
     },
 
     "nfc": {
-        "path": "tty:usbserial-110:pn532",
+        "path": "tty:USB0:pn532",
         "broadcast": true
     },
 

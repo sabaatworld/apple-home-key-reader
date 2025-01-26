@@ -5,6 +5,7 @@ import requests
 import signal
 import sys
 
+from logging.handlers import RotatingFileHandler
 from pyhap.accessory_driver import AccessoryDriver
 
 from accessory import Lock
@@ -15,6 +16,8 @@ from util.bfclf import BroadcastFrameContactlessFrontend
 # By default, this file is located in the same folder as the project
 CONFIGURATION_FILE_PATH = "configuration.json"
 HA_CONFIGURATION_FILE_PATH = "home-assistant.json"
+LOG_DIR = "logs"  # Directory for logs
+LOG_FILE_PATH = os.path.join(LOG_DIR, "application.log")  # Path for log file
 
 
 def load_configuration(path=CONFIGURATION_FILE_PATH) -> dict:
@@ -35,10 +38,21 @@ def configure_logging(config: dict):
     formatter = logging.Formatter(
         "[%(asctime)s] [%(levelname)8s] %(module)-18s:%(lineno)-4d %(message)s"
     )
-    hdlr = logging.StreamHandler(sys.stdout)
+    # Stream handler for stdout
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(formatter)
+
+    # Rotating file handler for log file
+    os.makedirs(LOG_DIR, exist_ok=True) # Ensure the logs directory exists
+    file_handler = RotatingFileHandler(
+        LOG_FILE_PATH, maxBytes=10 * 1024 * 1024, backupCount=5
+    )
+    file_handler.setFormatter(formatter)
+
+    # Configure logging level and handlers
     log.setLevel(config.get("level", logging.INFO))
-    hdlr.setFormatter(formatter)
-    log.addHandler(hdlr)
+    log.addHandler(stream_handler)
+    log.addHandler(file_handler)
     return log
 
 

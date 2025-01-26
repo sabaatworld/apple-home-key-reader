@@ -104,11 +104,105 @@ You can configure additional settings to link the state of the NFC lock with a H
 
 1. Clone `home-assistant.json.example` to `home-assistant.json` in the same directory.
 2. Update `home-assistant.json` with the following values:
+    * `connectionType`: Set to `api` to interact with Home Assistant using long-lived token. Set to `mqtt` to use configured MQTT topics for getting or setting the state of any cover entity.
     * `useSSL`: Specifies whether to use SSL (HTTPS / WSS) or not (HTTP / WS) when connecting to Home Assistant.
-    * `serverAddress`: The IP address or hostname of the Home Assistant server, along with the port number.
-    * `apiToken`: A long-lived access token generated in Home Assistant. You can follow [this guide](https://developers.home-assistant.io/docs/auth_api/#long-lived-access-token) to generate it.
-    * `entityId`: A valid cover entity in your Home Assistant instance.
+    * `serverAddress`: IP address or hostname of the Home Assistant server, along with the port number.
+    * `apiToken`: Long-lived access token generated in Home Assistant. You can follow [this guide](https://developers.home-assistant.io/docs/auth_api/#long-lived-access-token) to generate it.
+    * `entityId`: Valid cover entity in your Home Assistant instance.
+    * `mqttHost`: IP address or hostname of the MQTT broker.
+    * `mqttPort`: Port on which the MQTT broker is accessible.
+    * `mqttUseSSL`: Specifies whether to use SSL for connecting to MQTT broker.
+    * `mqttUseAuth`: Specifies whether to authenticate using the configured `mqttUsername` and `mqttPassword`.
+    * `mqttUsername`: Username for authentication with MQTT broker.
+    * `mqttPassword`: Password for authentication with MQTT broker.
+    * `mqttCoverStateGetTopic`: Topic which provides the current state of the cover entity in Home Assistant. Here is a sample automation that does this.
+        ```yaml
+        alias: Garage HomeKey Publish State
+        description: ""
+        triggers:
+          - trigger: state
+            entity_id:
+              - cover.garage_door
+          - trigger: homeassistant
+            event: start
+        conditions: []
+        actions:
+          - action: mqtt.publish
+            metadata: {}
+            data:
+              evaluate_payload: false
+              qos: 0
+              retain: true
+              topic: homekey/garage_door/state
+              payload: "{{ states('cover.garage_door') }}"
+        mode: single
+        ```
+    * `mqttCoverStateSetTopic`: Topic where the target state of the cover entity is sent by this application. Here is a sample automation that applies the state from this topic.
+        ```yaml
+        alias: Garage HomeKey Apply State
+        description: ""
+        triggers:
+          - trigger: mqtt
+            topic: homekey/garage_door/state/set
+        conditions: []
+        actions:
+          - action: cover.{{ "close" if trigger.payload == "closed" else "open" }}_cover
+            metadata: {}
+            data: {}
+            target:
+              entity_id: cover.garage_door
+        mode: single
+        ```
 3. Whenever you start the application, it will attempt to connect to your Home Assistant instance and link the lock to the configured cover entity.
+
+# Launch at Startup
+
+1. Create service definition.
+    ```shell
+    sudo nano /etc/systemd/system/apple-home-key.service
+    ```
+
+    ```shell
+    [Unit]
+    Description=Apple Home Key Reader Service
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    Type=simple
+    User=rpi
+    WorkingDirectory=/home/rpi/apple-home-key-reader
+    ExecStart=/home/rpi/apple-home-key-reader/venv/bin/python /home/rpi/apple-home-key-reader/main.py
+    Restart=on-failure
+    Environment="PYTHONUNBUFFERED=1"
+
+    [Install]
+    WantedBy=multi-user.target
+    ```
+
+1. Configure and start service.
+    ```shell
+    sudo chown -R rpi:rpi /home/rpi/apple-home-key-reader
+    sudo systemctl daemon-reload
+    sudo systemctl enable apple-home-key.service
+    sudo systemctl start apple-home-key.service
+    ```
+
+1. If needed, check service status.
+    ```shell
+    sudo systemctl status apple-home-key.service
+    ```
+
+1. If needed, restart service.
+    ```shell
+    sudo systemctl restart apple-home-key.service
+    ```
+
+1. If needed, check service logs.
+    ```shell
+    journalctl -u apple-home-key.service
+    journalctl -u apple-home-key.service -f
+    ```
 
 # Project structure
 

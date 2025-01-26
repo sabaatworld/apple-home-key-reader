@@ -18,7 +18,6 @@ class Lock(Accessory):
         self.serialNumber = serialNumber
         self.model = model
         self.firmware = firmware
-        self.updating_from_ha = False
         self.ha_config = ha_config
         if self.ha_config:
             self.home_assistant = HomeAssistant(ha_config, self.apply_lock_state_from_ha)
@@ -37,15 +36,21 @@ class Lock(Accessory):
 
 
     def on_endpoint_authenticated(self, endpoint):
-        self._lock_target_state = 0 if self._lock_current_state else 1
-        log.info(
-            f"Toggling lock state due to endpoint authentication event {self._lock_target_state} -> {self._lock_current_state} {endpoint}"
-        )
+        # If locking or unlocking, apply reverse of target state.
+        # If locked or unlocked, apply reverse of current state.
+        if not self._lock_current_state == self._lock_target_state:
+            self._lock_target_state = 0 if self._lock_target_state else 1
+        else:
+            self._lock_target_state = 0 if self._lock_current_state else 1
+        log.info(f"Toggling lock state due to endpoint authentication event")
         self.lock_target_state.set_value(self._lock_target_state, should_notify=True)
-        self._lock_current_state = self._lock_target_state
-        self.lock_current_state.set_value(self._lock_current_state, should_notify=True)
+        
+        if not self.ha_config:
+            # Don't wait for home assistant to say when to update current state
+            self._lock_current_state = self._lock_target_state
+            self.lock_current_state.set_value(self._lock_current_state, should_notify=True)
 
-        if self.ha_config and not self.updating_from_ha:
+        if self.ha_config:
             self.home_assistant.set_lock_state_in_ha(self._lock_target_state)
 
     def add_unpair_hook(self):
@@ -150,11 +155,15 @@ class Lock(Accessory):
 
     def set_lock_target_state(self, value):
         log.info(f"set_lock_target_state {value}")
-        self._lock_target_state = self._lock_current_state = value
-        self.lock_current_state.set_value(self._lock_current_state, should_notify=True)
+        self._lock_target_state = value
 
-        if self.ha_config and not self.updating_from_ha:
+        if self.ha_config:
             self.home_assistant.set_lock_state_in_ha(value)
+        
+        if not self.ha_config:
+            # Don't wait for home assistant to say when to update current state
+            self._lock_current_state = self._lock_target_state
+            self.lock_current_state.set_value(self._lock_current_state, should_notify=True)
 
         return self._lock_target_state
 
@@ -199,15 +208,9 @@ class Lock(Accessory):
         log.info(f"on_unpair {client_id}")
         self._update_hap_pairings()
 
-    def apply_lock_state_from_ha(self, new_lock_state):
-        self.updating_from_ha = True
-        try:
-            if new_lock_state != self._lock_current_state:
-                log.info(f"Applying lock state from Home Assistant: {new_lock_state}")
-                self._lock_target_state = self._lock_current_state = new_lock_state
-                self.lock_target_state.set_value(self._lock_target_state, should_notify=True)
-                self.lock_current_state.set_value(self._lock_current_state, should_notify=True)
-            else:
-                log.info(f"Lock state already matches Home Assistant: {new_lock_state}")
-        finally:
-            self.updating_from_ha = False
+    def apply_lock_state_from_ha(self, current_state, target_state):
+        log.info(f"Applying lock state from Home Assistant - current_state: {current_state} target_state: {target_state}")
+        self._lock_target_state = target_state
+        self._lock_current_state = current_state
+        self.lock_target_state.set_value(self._lock_target_state, should_notify=True)
+        self.lock_current_state.set_value(self._lock_current_state, should_notify=True)

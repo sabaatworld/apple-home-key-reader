@@ -1,6 +1,15 @@
 {
+    "connectionType": "api|mqtt",
     "useSSL": false,
     "serverAddress": "XXX.XXX.XXX.XXX:8123",
     "apiToken": "XXXX",
-    "entityId": "cover.garage_door"
+    "entityId": "cover.garage_door",
+    "mqttHost": "XXX.XXX.XXX.XXX",
+    "mqttPort": "1883",
+    "mqttUseSSL": false,
+    "mqttUseAuth": false,
+    "mqttUsername": "username",
+    "mqttPassword": "password",
+    "mqttCoverStateGetTopic": "homkey/garage_door/state",
+    "mqttCoverStateSetTopic": "homkey/garage_door/state/set"
 }
